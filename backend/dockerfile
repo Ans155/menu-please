@@ -1,0 +1,35 @@
+# Stage 1: Build the backend
+FROM oven/bun:latest AS build
+
+# Set the working directory
+WORKDIR /app
+
+# Copy package.json and bun.lockb
+COPY package.json bun.lockb* ./
+
+# Install dependencies
+RUN bun install
+
+# Copy the rest of the backend code
+COPY . .
+
+# Compile the backend
+RUN bun run compile
+
+# Stage 2: Final stage
+FROM ubuntu:20.04
+
+# Set the working directory
+WORKDIR /app
+
+# Copy backend build files from the build stage
+COPY --from=build /app/build /app/build
+
+# Copy resources directory from the build stage
+COPY --from=build /app/resources /app/resources
+
+# Expose the backend port
+EXPOSE 5000
+
+# Run the backend application
+CMD ["/app/build/x"]

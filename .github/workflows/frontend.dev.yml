@@ -1,0 +1,42 @@
+name: frontend Dev Build and Deploy
+on:
+    workflow_dispatch:
+env:
+  AWS_REGION: ap-south-1
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Build App
+        working-directory: ./frontend
+        run: CI=false npm run build
+
+      - name: Sync build folder to S3 bucket
+        run: aws s3 sync frontend/build/ s3://dev.px.onepercentclub.io --delete
+
+      - name: Enable 21 days caching of JS and CSS
+        run: aws s3 cp s3://dev.px.onepercentclub.io/ s3://dev.px.onepercentclub.io/ --recursive --exclude '*' --include '*.js' --include '*.json' --include '*.css' --cache-control 'max-age=1814000'
+
+      - name: Enable 21 days caching of Media Files
+        run: aws s3 cp s3://dev.px.onepercentclub.io/ s3://dev.px.onepercentclub.io/ --recursive --exclude '*' --include '*.gif' --include '*.svg' --include '*.jpeg' --include '*.jpg' --include '*.png' --include '*.ttf' --include '*.ico' --include '*.webp' --include '*.mp3' --cache-control 'max-age=1814000'
+
+      - name: Invalidate Cloudfront Cache
+        run: aws cloudfront create-invalidation --distribution-id E3H0Q1B8HGRR0X --paths '/*'
